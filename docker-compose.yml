@@ -1,0 +1,50 @@
+version: '3.3'
+services:
+  app:
+    build:
+      dockerfile: Dockerfile.app
+      context: .
+    depends_on:
+      - redis
+      - db
+    ports:
+      - "8080:80"
+
+  worker:
+    build:
+      dockerfile: Dockerfile.worker
+      context: .
+    depends_on:
+      - redis
+      - app
+
+  redis:
+    image: redis:alpine
+    ports:
+      - 6379:6379
+
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: local_debug
+      MYSQL_DATABASE: database
+      MYSQL_USER: user
+      MYSQL_PASSWORD: user_password
+    ports:
+      - 3306:3306
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d/:ro
+      - ./.mysql-data/db:/var/lib/mysql
+
+  dashboard:
+    image: eoranged/rq-dashboard
+    depends_on:
+      - redis
+    ports:
+      - 9181:9181
+    environment:
+      - RQ_DASHBOARD_REDIS_URL=redis://redis:6379
+      - RQ_DASHBOARD_USERNAME=rq
+      - RQ_DASHBOARD_PASSWORD=password
+  

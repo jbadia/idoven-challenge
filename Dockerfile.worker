@@ -1,0 +1,10 @@
+FROM python:3.10
+
+WORKDIR /app
+
+COPY requirements.worker.txt requirements.txt
+COPY worker /app
+COPY modules /app/modules
+RUN pip install --no-cache-dir -r requirements.txt
+
+CMD ["python", "worker.py"]

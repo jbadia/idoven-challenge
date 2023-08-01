@@ -1,40 +1,123 @@
-# Backend Coding Challenge
+# Backend Coding Challenge - Proposal
 
-The first thing is to welcome you to this test, congratulations for successfully passing the previous steps, thank you
-for the time invested in the process and of course good luck.
+Thank you for the warm welcome and kind words! I'm thrilled to have successfully passed the previous steps and now take on this new challenge. 
 
-At Idoven we have a need, we want to set up a microservice that receives electrocardiograms (ECG) and returns a series
-of information about them, for example, calculating the number of zero crossings of the signal.
+## 1. Services
 
-An ECG is represented by a series of numerical values that can be either positive or negative.
+There are 3 main components. One API one RQ worker and a database to persist the ECGs. By design the number of endpoints has been limited to the ones required for the assingment. And the results are retrived directly from the RQ / redis
 
-The idea is to set up an API that acts as a service and with two endpoints, one to receive the ECGs to be processed and
-another where we return information.
+### app
+Projects API and main component of the assignment, were we can perform the following tasks:
+  - create users
+  - process ECGs
+  - get ECGs results
 
-ECGs have this structure:
+The enpoints are listed on section ***`3.`*** with examples
 
+components used:
+- Flask
+- JSON Web Tokens (auth)
+- Pony ORM 
+
+### worker
+RQ worker using a redis queue to enqueue tasks. The `modules` directory is shared with the api (app) and uses `Dask.array` instead of vanilla python or numpy as it can handle large amounts of data.
+
+### redis
+Required by RQ to queue jobs and retrieve the results.
+
+### MySQL
+SQL database used to persist data
+
+### RQ Dashboard
+Not required. Used to review the queue.
+
+```config
+URL: http://localhost:9181
+user: rq
+password: password
+```  
+
+## 2. Management
+Although the services are handled with `docker-compose` and that should be enought to operate them. 
+
+A `Makefile` has been included to simplify all the operations
+
+Project build and start
+```bash
+  make run
 ```
-- id: unique identifier for each ECG
-- date: creation date
-- leads: list of:
-  - name: lead identifier (for example: I, II, III, aVR, aVL and aVF, V1, V2…)
-  - number of samples: sample size of the signal, this value does not always come
-  - signal: list of integer values
+
+Stop the service
+```bash
+  make stop
 ```
 
-The information that the endpoint must return will be the number of times that each of the ECG channels passes through
-zero. For now we do not need more information.
+List running services
+```bash
+  make status
+```
 
-Freedom is given to use language, technologies, frameworks, documentation, tests... We currently use Python 3.10.9,
-FastAPI, JIRA, GitHub.
+Run unit tests for metrics module
+```bash
+  make test-module
+```
 
-It must be taken into account that this service is going to scale, and more functionalities are going to be added to it
-and the endpoint of obtaining information about an ECG is going to calculate more data.
+Create a ***admin/admin*** user with `admin` role
+```bash
+  make create-admin
+```
 
-In addition, we are thinking of opening this service to external clients, so we are considering using a user
-authentication system for both endpoints. And with the necessary security to only be able to access the ECGs created by
-yourself.
-And it would be nice to have an ADMIN role that is in charge of registering new users. This user would not have access
-to send or obtain information about the ECGs.
+## 3. Endpoints
+Intead of defining the endpoints and parameter, a list of `HTTPie` commands is provided as it's self descriptive
 
-The test solution must be posted on this repository like a pull request.
+### Request token
+``` bash
+http POST :8080/token user=admin password=1234
+
+{
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### Create user
+```bash
+http POST :8080/user user=user password=1234 roles:='["user", "admin"]' Authorization:'Bearer <access_token>'
+```
+> instead of forcing a role per user, as suggested, a multi role per user has been implemented. The role is optional, if not provided a regular user is created
+
+### Process ECG
+```bash
+http POST :8080/ecg/process id=10 date='2023-07-30' leads:='[{"name": "I", "signal": [1,-1,1]}]' Authorization:'Bearer <access_token>'
+
+{
+    "id": "10",
+    "status": "queued"
+}
+```
+
+### Check ECG
+```bash
+http GET :8080/ecg/10 Authorization:'Bearer <access_token>'
+
+{
+    "id": "10",
+    "leads": [
+        {
+            "I": {
+                "zero_crossings": 2
+            }
+        }
+    ],
+    "status": "completed"
+}
+```
+
+## 4. What's out and should be included
+### JSON Schemas
+The model-view should include JSON Schemas to validate the JSON data provided on the `POST` requests 
+
+### Integration Tests
+The API (app) and worker services should be adjusted to run the components internally to completely test the services.
+- API: Redis, Mysql
+
+Once again, thank you for the encouraging words and this opportunity.
